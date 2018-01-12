@@ -1,0 +1,256 @@
+#  -*- mode: org; -*-
+
+#+TITLE:       MPI-Datatybe -- MPI Datatype Benchmark
+#+AUTHOR:      
+#+EMAIL:       
+
+#+OPTIONS: ^:nil toc:nil <:nil
+
+#+LaTeX_CLASS_OPTIONS: [a4paper]
+#+LaTeX_CLASS_OPTIONS: [11pt]
+
+#+LATEX_HEADER: \usepackage{bibentry}
+#+LATEX_HEADER: \nobibliography*
+#+LATEX_HEADER: \usepackage{listings}
+
+
+* Introduction
+
+The MPI-Datatybe Benchmark is a tool for measuring the latency of MPI
+communication operations with unstructured data, either described as
+derived datatypes or packed into contiguous buffers using the
+MPI_Pack/MPI_Unpack operations.
+
+
+* Installation
+
+** Prerequisites
+  - an MPI library 
+  - CMake (version >= 2.6)  
+  - GSL libraries 
+  - Python 2.7
+  - Git
+
+** Basic build
+
+The build script includes the following steps:
+- it creates a =build= directory, in which it either downloads the
+  ReproMPI benchmark from a git reporsitory, or it copies the code
+  from a specified path
+- the MPI-Datatybe benchmark code is generated in the =build=
+  directory, by replacing ReproMPi-specific tags in the code with
+  actual benchmarking code (e.g., process synchronization calls, time
+  measurement calls); a =CmakeLists.txt= file and additional CMake
+  helper files are also generated to allow the code to be compiled
+- ReproMPI and MPI-Datatybe are both configured through calls to
+  *cmake*
+- Both codes are compiled
+
+The default build configuration is stored in =config/build.conf= file.
+
+To build the code using the default configuration, run:
+#+BEGIN_EXAMPLE
+  cd $BENCHMARK_PATH
+  ./build.py all 
+#+END_EXAMPLE
+
+For specific configuration options check the *Benchmark Configuration* section.
+
+* Running the MPI-Datatybe Benchmark
+
+MPI-Datatybe is designed to benchmark the latency of one MPI
+communication operation (MPI_Bcast, MPI_Allgather, or a Ping-Pong
+operation based on MPI_Send and MPI_Recv).  The latency is measured
+for a given data size and a layout described using one of the
+following predefined derived datatypes:
+
+- Basic derived datatypes
+  - *tiled* - A contiguous unit of A elements with a stride of B
+    elements, with B > A
+  - *block* - Two contiguous units of A elements with alternating
+    strides B_1 and B_2
+  - *bucket* - Two alternating, contiguous units of A_1 and A_2
+    elements, with a regular stride of B elements
+  - *alternating* - Two alternating, contiguous units of A_1 and A_2
+    elements with strides B_1 and B_2, respectively
+
+- Predefined MPI datatypes (e.g., MPI_INT, MPI_CHAR)
+  - *basetype*
+
+- Contiguous datatype describing =c= contiguous repetitions of one of
+  the four basic datatypes
+  - *contig_type*
+
+- Additional derived datatypes 
+  - *tiled_heterogeneous*
+  - *tiled_struct*
+  - *tiled_vector*
+  - *vector_tiled*
+  - *tiled_struct_indexed_all*
+  - *tiled_struct_indexed_Sblocks*
+  - *blocks*
+  - *block_indexed*
+  - *alternating_repeated*
+  - *alternating_struct*
+  - *alternating_indexed*
+  - *alternating_indexed_fixed*
+  - *contig_alternating_indexed_fixed*
+  - *alternating_aligned*
+  - *rowcol_full_indexed*
+  - *rowcol_contiguous_and_indexed*
+  - *rowcol_struct*
+
+Details about each of these datatypes can be found in the following papers:
+- Alexandra Carpen-Amarie, Sascha Hunold, Jesper Larsson Träff, "On
+  the Expected and Observed Communication Performance with MPI Derived
+  Datatypes", EuroMPI 2016, pages 108-120
+- Alexandra Carpen-Amarie, Sascha Hunold, Jesper Larsson Träff, "On
+  Expected and Observed Communication Performance with MPI Derived
+  Datatypes", Parallel Computing, 2017
+
+The implementation of the derived datatypes can be found in:
+- =src/perftypes.c=
+
+
+** Command-line Options
+
+The required command-line arguments to run the benchmark can be
+divided into two groups.
+
+*** Datatype-specific Parameters
+
+Each of these parameters can be specified as a key-value pair:
+*--param=<key>:<value>*
+
+The following parameters are required:
+- *--param=nbytes_list:<list of "/"-separated data sizes>* - list of
+  data sizes to be used when benchmarking the specified data layout
+  and operation
+
+- *--param=b:<basetype>* - basic predefined MPI type to be used as a
+  building block for the derived datatypes. Accepted values: MPI_CHAR,
+  MPI_INT, MPI_FLOAT, MPI_DOUBLE, MPI_SHORT, MPI_BYTE
+
+- *--param=pattern:<operation>* - communication pattern to be
+  benchmarked. Accepted values: *bcast*, *allgather*, *pingpong*
+
+- *--param=root:<process_id>* - root process for the broadcast pattern
+  or send process for the ping-pong operation
+
+- *--param=test_type:<type>* - select communication based on derived
+  datatypes or on contiguous buffers obtained by applying
+  MPI_Pack/MPI_Unpack to the non-contiguous data layouts. Accepted
+  values: *datatype*, *pack*
+
+- *--param=layout:<derived_datatype>* - derived datatype to be used
+  for communication.
+
+- layout-specific parameters
+  - *--param=layout:tiled --params=A:<nelements> --params=B:<nelements>*
+
+  - *--param=layout:bucket --params=A1:<nelements> --params=A2:<nelements> --params=B:<nelements>*
+
+  - *--param=layout:block --params=A:<nelements> --params=B1:<nelements> --params=B2:<nelements>*
+
+  - *--param=layout:alternating --params=A1:<nelements> --params=A2:<nelements> --params=B1:<nelements> --params=B2:<nelements>* 
+
+  - *--param=layout:basetype*
+
+  - *--param=layout:tiled_heterogeneous --params=A:<nelements> --params=B:<nelements> --params=c:<nbasetypes> --params=blist:<list of "/"-separated basetypes>*
+
+  - *--param=layout:tiled_struct --params=A:<nelements> --params=B:<nelements> --params=S1:<nblocks> --params=S2:<nblocks>*
+
+  - *--param=layout:tiled_vector --params=A:<nelements> --params=B:<nelements>*
+
+  - *--param=layout:vector_tiled --params=A:<nelements> --params=B:<nelements> --params=S:<nblocks>*
+
+  - *--param=layout:tiled_struct_indexed_all --params=A:<nelements> --params=B:<nelements>*
+
+  - *--param=layout:tiled_struct_indexed_Sblocks --params=A:<nelements> --params=B:<nelements> --params=S:<nblocks>*
+
+  - *--param=layout:blocks --params=A:<nelements> --params=B:<nelements> --params=l:<nblocks>*
+
+  - *--param=layout:block_indexed --params=A:<nelements> --params=B1:<nelements> --params=B2:<nelements>*
+
+  - *--param=layout:alternating_repeated --params=A1:<nelements> --params=A2:<nelements> --params=B:<nelements>*
+
+  - *--param=layout:alternating_struct --params=A1:<nelements> --params=A2:<nelements> --params=B:<nelements>*
+
+  - *--param=layout:alternating_indexed --params=A1:<nelements> --params=A2:<nelements> --params=B1:<nelements> --params=B2:<nelements>*
+
+  - *--param=layout:alternating_indexed_fixed --params=A1:<nelements> --params=A2:<nelements> --params=B:<nelements> --params=S:<nblocks>*
+
+  - *--param=layout:contig_alternating_indexed_fixed --params=A1:<nelements> --params=A2:<nelements> --params=B:<nelements> --params=S:<nblocks>*
+
+  - *--param=layout:alternating_aligned --params=A1:<nelements> --params=A2:<nelements> --params=B1:<nelements> --params=B2:<nelements>*
+
+  - *--param=layout:rowcol_full_indexed --params=A:<nelements>*
+
+  - *--param=layout:rowcol_contiguous_and_indexed --params=A:<nelements>*
+
+  - *--param=layout:rowcol_struct --params=A:<nelements>*
+
+  - *--param=layout:contig_type --param=subtype:<basic_datatype> <basic_datatype_parameters>*
+    - the subtype has to be one of the four basic datatypes *tiled*, *block*, *bucket*, or *alternating*
+    - the <basic_datatype_parameters> are specific to each layout as
+      shown above, e.g., for the tiled subtype:
+      - *--param=layout:contig_type --param=subtype:tiled --params=A:<nelements> --params=B:<nelements>*
+
+
+*** Run-time Measurement Parameters
+
+- *--nrep=<nrep>* set number of repetitions for each measurement
+- *--summary=<args>* list of comma-separated data summarizing methods
+  (mean, median, min, max), e.g., =--summary=mean,max=. Instead of
+  printing the run-time measured for each repetition, the benchmark
+  will only output one summarized value when this argument is used
+
+- *-v* print the individual run-times measured for each process
+
+- additional parameters that depend on the ReproMPI configuration 
+  
+  - parameters Related to the Window-based Synchronization
+    - *--window-size=<win>* window size in microseconds for window-based synchronization
+    - *--fitpoints=<nfit>* number of fitpoints (default: 20) - used by
+      the HCA or JK synchronization methods
+    - *--exchanges=<nexc>* number of exchanges (default: 10) - used by
+      the HCA or JK synchronization methods
+
+For more details about the benchmarking parameters, please check the
+ReproMPI README file (=https://github.com/hunsa/reprompi=).
+
+
+* Benchmark Configuration
+
+The build script relies on several parameters to further customize the
+benchmark configuration:
+- *--git GIT* - URL or local path to git repository (a path to the
+  ReproMPI code directory on the local machine can also be provided
+  instead of the path to a repository)
+- *--sha1 SHA1* - commit SHA1 to use (not needed if a local path is
+  specified)
+- *--synctype {mpi_barrier,dissemination_barrier,hca,jk,skampi}* -
+  select process synchronization method in ReproMPI [default:
+  MPI_Barrier]
+- *--compilertype {cray,bgq,intel,default}* - select compiler
+  [default: mpicc needs to be available in the path]
+
+- *--rdtscp* - enable RDTSCP-based time measurement in ReproMPI
+- *--cpufreq CPUFREQ* - set maximum CPU frequency in MHz (always
+  needed when RDTSCP-based timing is enabled) [default: 2300 MHz]
+
+
+
+** MPI libraries and compilers
+MPI-Datatybe and ReproMPI provide a set of configuration files for
+commonly-used machines. To use a different compiler, run the build
+script with the *configure* option, then manually modify the
+=CMakeLists.txt= files in both benchmarks to match the new
+requirements, and re-run *cmake*.
+
+For more details about the compiler and MPI library configuration,
+please check the ReproMPI README file
+(=https://github.com/hunsa/reprompi=).
+
+The *compile* option can then be used to compile both codes.
+
